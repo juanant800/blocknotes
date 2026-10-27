@@ -1,5 +1,6 @@
 package com.example.blocknotes.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -125,7 +126,7 @@ private fun TocBlock(headings: List<Block>) {
             Text(
                 h.text.ifBlank { "Sin título" },
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = indent, vertical = 3.dp),
+                modifier = Modifier.padding(start = indent).padding(vertical = 3.dp),
             )
         }
     }
