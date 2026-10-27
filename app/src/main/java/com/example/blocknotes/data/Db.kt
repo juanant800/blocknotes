@@ -2,6 +2,8 @@ package com.example.blocknotes.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -12,10 +14,10 @@ data class Page(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val parentId: String? = null,
     val title: String = "",
-    val icon: String = "",        // emoji o vacío
-    val coverColor: String = "",  // "#RRGGBB" o vacío
-    val coverUri: String = "",    // imagen de la galería
-    val font: String = "SANS",    // SANS, SERIF, MONO, CURSIVE
+    val icon: String = "",
+    val coverColor: String = "",
+    val coverUri: String = "",
+    val font: String = "SANS",
     val updatedAt: Long = System.currentTimeMillis(),
     val deleted: Boolean = false,
 )
@@ -26,9 +28,19 @@ data class Block(
     val pageId: String,
     val type: BlockType = BlockType.TEXT,
     val text: String = "",
-    val meta: String = "",        // uri de imagen, cuerpo de desplegable, emoji de destacado
-    val checked: Boolean = false, // tarea marcada o desplegable abierto
+    val meta: String = "",
+    val checked: Boolean = false,
     val position: Double,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val deleted: Boolean = false,
+)
+
+@Entity(tableName = "events")
+data class Event(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val startAt: Long,
+    val pageId: String? = null,
     val updatedAt: Long = System.currentTimeMillis(),
     val deleted: Boolean = false,
 )
@@ -43,6 +55,9 @@ interface PageDao {
 
     @Query("SELECT * FROM pages WHERE id = :id")
     suspend fun get(id: String): Page?
+
+    @Query("SELECT * FROM pages WHERE deleted = 0 ORDER BY updatedAt DESC LIMIT 5")
+    fun recent(): Flow<List<Page>>
 
     @Query("SELECT * FROM pages WHERE deleted = 1 ORDER BY updatedAt DESC")
     fun trashed(): Flow<List<Page>>
@@ -67,15 +82,37 @@ interface BlockDao {
     suspend fun softDelete(id: String, t: Long)
 }
 
-@Database(entities = [Page::class, Block::class], version = 2, exportSchema = false)
+@Dao
+interface EventDao {
+    @Query("SELECT * FROM events WHERE deleted = 0 AND startAt >= :from AND startAt < :to ORDER BY startAt")
+    fun between(from: Long, to: Long): Flow<List<Event>>
+
+    @Query("SELECT * FROM events WHERE deleted = 0 AND startAt >= :from ORDER BY startAt LIMIT 30")
+    fun upcoming(from: Long): Flow<List<Event>>
+
+    @Upsert suspend fun upsert(e: Event)
+
+    @Query("UPDATE events SET deleted = 1, updatedAt = :t WHERE id = :id")
+    suspend fun softDelete(id: String, t: Long)
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS events (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, startAt INTEGER NOT NULL, pageId TEXT, updatedAt INTEGER NOT NULL, deleted INTEGER NOT NULL)")
+    }
+}
+
+@Database(entities = [Page::class, Block::class, Event::class], version = 3, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun pages(): PageDao
     abstract fun blocks(): BlockDao
+    abstract fun events(): EventDao
 
     companion object {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "blocknotes.db")
+                .addMigrations(MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
                 .also { inst = it }

@@ -9,7 +9,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.blocknotes.ui.BlockNotesTheme
 import com.example.blocknotes.ui.EditorScreen
+import com.example.blocknotes.ui.MainScreen
 import com.example.blocknotes.ui.PageListScreen
+import com.example.blocknotes.ui.Prefs
 import com.example.blocknotes.ui.SearchScreen
 import com.example.blocknotes.ui.TrashScreen
 
@@ -17,14 +19,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Prefs.load(this)
         setContent {
             BlockNotesTheme {
                 val nav = rememberNavController()
-                NavHost(nav, startDestination = "list/root") {
+                NavHost(nav, startDestination = "main") {
+                    composable("main") {
+                        MainScreen(
+                            onOpenPage = { nav.navigate("page/$it") },
+                            onSearch = { nav.navigate("search") },
+                            onTrash = { nav.navigate("trash") },
+                        )
+                    }
                     composable("list/{parent}") { e ->
-                        val parent = e.arguments?.getString("parent")?.takeIf { it != "root" }
                         PageListScreen(
-                            parentId = parent,
+                            parentId = e.arguments?.getString("parent"),
                             onOpen = { nav.navigate("page/$it") },
                             onBack = { nav.popBackStack() },
                             onSearch = { nav.navigate("search") },
