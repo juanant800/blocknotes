@@ -20,7 +20,9 @@ jobs:
           gradle-version: '8.9'
 
       - name: Compilar APK de depuración
-        run: gradle assembleDebug --stacktrace
+        env:
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g"
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
