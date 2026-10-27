@@ -2,12 +2,13 @@ package com.example.blocknotes.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -38,7 +40,6 @@ import com.example.blocknotes.data.BlockType
 
 private val listTypes = setOf(BlockType.TODO, BlockType.BULLET, BlockType.NUMBERED)
 
-// Atajos tipo Markdown: se activan al escribir el prefijo al inicio de un bloque de texto.
 private val shortcuts = listOf(
     "# " to BlockType.H1,
     "## " to BlockType.H2,
@@ -50,7 +51,7 @@ private val shortcuts = listOf(
     "> " to BlockType.QUOTE,
 )
 
-private fun styleFor(t: BlockType, font: FontFamily, color: androidx.compose.ui.graphics.Color): TextStyle = when (t) {
+private fun styleFor(t: BlockType, font: FontFamily, color: Color): TextStyle = when (t) {
     BlockType.H1 -> TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = font, lineHeight = 36.sp, color = color)
     BlockType.H2 -> TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = font, lineHeight = 30.sp, color = color)
     BlockType.H3 -> TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = font, lineHeight = 26.sp, color = color)
@@ -60,7 +61,7 @@ private fun styleFor(t: BlockType, font: FontFamily, color: androidx.compose.ui.
 }
 
 private fun placeholderFor(t: BlockType): String = when (t) {
-    BlockType.TEXT -> "Escribe / para ver comandos…"
+    BlockType.TEXT -> "Escribe / para elegir un bloque…"
     BlockType.TODO -> "Tarea pendiente"
     BlockType.BULLET -> "Elemento de lista"
     BlockType.NUMBERED -> "Elemento numerado"
@@ -103,7 +104,7 @@ private fun ImageBlock(uri: String) {
         Image(
             bitmap = bmp,
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
             contentScale = ContentScale.FillWidth,
         )
     } else {
@@ -113,14 +114,22 @@ private fun ImageBlock(uri: String) {
 
 @Composable
 private fun TocBlock(headings: List<Block>) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+    ) {
+        Text("📑 Índice", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
         if (headings.isEmpty()) {
-            Text("Añade títulos para ver el índice aquí.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Añade títulos para verlos aquí.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         headings.forEach { h ->
             val indent = when (h.type) {
-                BlockType.H2 -> 16.dp
-                BlockType.H3 -> 32.dp
+                BlockType.H2 -> 14.dp
+                BlockType.H3 -> 28.dp
                 else -> 0.dp
             }
             Text(
@@ -132,6 +141,7 @@ private fun TocBlock(headings: List<Block>) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockRow(
     b: Block,
@@ -145,10 +155,12 @@ fun BlockRow(
 ) {
     val onColor = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
     val hasText = b.type != BlockType.DIVIDER && b.type != BlockType.IMAGE && b.type != BlockType.TOC
     var text by remember(b.id) { mutableStateOf(b.text) }
     var body by remember(b.id) { mutableStateOf(b.meta) }
     var menu by remember { mutableStateOf(false) }
+    var sheet by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
 
     LaunchedEffect(vm.focusId) {
@@ -156,6 +168,15 @@ fun BlockRow(
             if (hasText) runCatching { focus.requestFocus() }
             vm.focusId = null
         }
+    }
+
+    fun pick(t: BlockType, clearText: Boolean) {
+        if (clearText) text = ""
+        if (t == BlockType.IMAGE) {
+            onPickImage(b)
+            return
+        }
+        vm.update(b.copy(type = t, text = if (clearText) "" else text))
     }
 
     fun onTextChange(new: String) {
@@ -227,24 +248,27 @@ fun BlockRow(
 
             Column(Modifier.weight(1f)) {
                 when (b.type) {
-                    BlockType.DIVIDER -> HorizontalDivider(
-                        Modifier.padding(vertical = 14.dp),
-                        color = MaterialTheme.colorScheme.outline,
-                    )
+                    BlockType.DIVIDER -> HorizontalDivider(Modifier.padding(vertical = 14.dp), color = outline)
                     BlockType.IMAGE -> ImageBlock(b.meta)
                     BlockType.TOC -> TocBlock(headings)
                     BlockType.CALLOUT -> Row(
-                        Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(12.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
-                        Text(
-                            text = b.meta.ifBlank { "💡" },
-                            fontSize = 20.sp,
-                            modifier = Modifier.clickable { vm.update(b.copy(meta = nextEmoji(b.meta), text = text)) },
-                        )
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFFACC15).copy(alpha = 0.22f))
+                                .clickable { vm.update(b.copy(meta = nextEmoji(b.meta), text = text)) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(b.meta.ifBlank { "💡" }, fontSize = 18.sp)
+                        }
                         Spacer(Modifier.width(10.dp))
                         BlockField(
                             value = text,
@@ -257,7 +281,7 @@ fun BlockRow(
                         )
                     }
                     BlockType.QUOTE -> Row(Modifier.height(IntrinsicSize.Min)) {
-                        Box(Modifier.width(3.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+                        Box(Modifier.width(4.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Color(0xFFFB923C)))
                         Spacer(Modifier.width(12.dp))
                         BlockField(
                             value = text,
@@ -280,20 +304,30 @@ fun BlockRow(
                             placeholder = "Desplegable",
                         )
                         if (b.checked) {
-                            BlockField(
-                                value = body,
-                                onValue = { body = it; vm.update(b.copy(meta = it, text = text)) },
-                                style = styleFor(BlockType.TEXT, font, muted),
-                                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 6.dp),
-                                placeholder = "Contenido oculto…",
-                            )
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(10.dp),
+                            ) {
+                                BlockField(
+                                    value = body,
+                                    onValue = { body = it; vm.update(b.copy(meta = it, text = text)) },
+                                    style = styleFor(BlockType.TEXT, font, muted),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = "Contenido oculto…",
+                                )
+                            }
                         }
                     }
                     BlockType.CODE -> Box(
-                        Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(10.dp),
+                            .padding(12.dp),
                     ) {
                         BlockField(
                             value = text,
@@ -318,15 +352,31 @@ fun BlockRow(
 
                 if (hasText && text.startsWith("/")) {
                     val q = text.drop(1).lowercase()
-                    LazyRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(BlockType.entries.filter { labelOf(it).lowercase().contains(q) }) { t ->
-                            AssistChip(
-                                onClick = {
-                                    text = ""
-                                    if (t == BlockType.IMAGE) onPickImage(b) else vm.update(b.copy(type = t, text = ""))
-                                },
-                                label = { Text(labelOf(t)) },
-                            )
+                    val filtered = BlockType.entries.filter {
+                        labelOf(it).lowercase().contains(q) || infoOf(it).desc.lowercase().contains(q)
+                    }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, outline, RoundedCornerShape(16.dp))
+                            .padding(10.dp)
+                            .heightIn(max = 340.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        Text(
+                            "Bloques básicos",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = muted,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                        )
+                        if (filtered.isEmpty()) {
+                            Text("Sin resultados para \"$q\"", color = muted, modifier = Modifier.padding(4.dp))
+                        } else {
+                            BlockTypeList(filtered) { t -> pick(t, clearText = true) }
                         }
                     }
                 }
@@ -342,6 +392,11 @@ fun BlockRow(
                     )
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Cambiar tipo de bloque") },
+                        leadingIcon = { Icon(Icons.Default.Edit, null) },
+                        onClick = { menu = false; sheet = true },
+                    )
                     if (canUp) {
                         DropdownMenuItem(
                             text = { Text("Subir") },
@@ -357,21 +412,25 @@ fun BlockRow(
                         )
                     }
                     HorizontalDivider()
-                    BlockType.entries.forEach { t ->
-                        DropdownMenuItem(
-                            text = { Text(labelOf(t)) },
-                            onClick = {
-                                menu = false
-                                if (t == BlockType.IMAGE) onPickImage(b) else vm.update(b.copy(type = t))
-                            },
-                        )
-                    }
-                    HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Borrar") },
                         leadingIcon = { Icon(Icons.Default.Delete, null) },
                         onClick = { menu = false; vm.remove(b) },
                     )
+                }
+            }
+        }
+    }
+
+    if (sheet) {
+        ModalBottomSheet(onDismissRequest = { sheet = false }) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 28.dp)) {
+                Text("Cambiar tipo de bloque", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Elige cómo se ve este bloque", color = muted, fontSize = 13.sp)
+                Spacer(Modifier.height(14.dp))
+                BlockTypeList(BlockType.entries) { t ->
+                    sheet = false
+                    pick(t, clearText = false)
                 }
             }
         }

@@ -1,6 +1,8 @@
 package com.example.blocknotes.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -125,7 +127,9 @@ private fun PagesTab(pad: PaddingValues, onOpenPage: (String) -> Unit, onSearch:
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(p.icon.ifBlank { "📄" }, fontSize = 20.sp)
+                        PageCover(p, Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))) {
+                            Text(p.icon.ifBlank { "📄" }, fontSize = 20.sp, modifier = Modifier.align(Alignment.Center))
+                        }
                         Spacer(Modifier.width(12.dp))
                         Text(p.title.ifBlank { "Sin título" }, Modifier.weight(1f), fontWeight = FontWeight.Medium)
                         IconButton(onClick = { vm.trash(p.id) }) { Icon(Icons.Default.Delete, "Mover a la papelera") }

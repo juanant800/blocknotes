@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -142,32 +144,20 @@ fun HomeTab(
         }
 
         item {
-            SectionCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.padding(bottom = 16.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     SectionTitleInline("🕘", "Recientes", Modifier.weight(1f))
                     TextButton(onClick = { onGoTab(1) }) { Text("Ver todo") }
                 }
-                recent.forEach { p ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenPage(p.id) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(p.icon.ifBlank { "📄" }, fontSize = 18.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(p.title.ifBlank { "Sin título" }, maxLines = 1, fontWeight = FontWeight.Medium)
-                            Text(relTime(p.updatedAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                if (recent.isEmpty()) {
-                    Text("Nada reciente todavía.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(recent, key = { it.id }) { p -> PageCard(p) { onOpenPage(p.id) } }
                 }
             }
         }
+
     }
 }
 
@@ -263,5 +253,30 @@ private fun PageLine(p: Page, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Text(p.title.ifBlank { "Sin título" }, Modifier.weight(1f), maxLines = 1, fontFamily = fontFamilyOf(p.font))
         Icon(Icons.Default.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PageCard(p: Page, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        Modifier
+            .width(170.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick),
+    ) {
+        PageCover(p, Modifier.fillMaxWidth().height(96.dp)) {
+            Text(
+                p.icon.ifBlank { "📄" },
+                fontSize = 22.sp,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 6.dp),
+            )
+        }
+        Column(Modifier.padding(12.dp)) {
+            Text(p.title.ifBlank { "Sin título" }, maxLines = 1, fontWeight = FontWeight.SemiBold, fontFamily = fontFamilyOf(p.font))
+            Text(relTime(p.updatedAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
